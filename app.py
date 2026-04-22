@@ -11,8 +11,8 @@ from meta_api import calc_budget, get_campaigns, get_insights, parse_metrics
 
 load_dotenv()
 
-TOKEN     = os.getenv("META_ACCESS_TOKEN", "")
-ACCOUNT_ID = os.getenv("META_ACCOUNT_ID", "512456638065694")
+TOKEN      = os.getenv("META_ACCESS_TOKEN") or st.secrets.get("META_ACCESS_TOKEN", "")
+ACCOUNT_ID = os.getenv("META_ACCOUNT_ID") or st.secrets.get("META_ACCOUNT_ID", "512456638065694")
 REFRESH_MS = 15 * 60 * 1000
 
 RED    = "#8B1A1A"
