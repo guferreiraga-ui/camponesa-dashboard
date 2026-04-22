@@ -1,351 +1,200 @@
-import os
-import time
-import base64
-
-import pandas as pd
-import plotly.graph_objects as go
+import os, time, base64, html
 import streamlit as st
+import plotly.graph_objects as go
 from dotenv import load_dotenv
 from streamlit_autorefresh import st_autorefresh
-
 from meta_api import calc_budget, get_campaigns, get_insights, parse_metrics
 
 load_dotenv()
-
 TOKEN      = os.getenv("META_ACCESS_TOKEN") or st.secrets.get("META_ACCESS_TOKEN", "")
-ACCOUNT_ID = os.getenv("META_ACCOUNT_ID") or st.secrets.get("META_ACCOUNT_ID", "512456638065694")
+ACCOUNT_ID = os.getenv("META_ACCOUNT_ID")   or st.secrets.get("META_ACCOUNT_ID", "512456638065694")
 REFRESH_MS = 15 * 60 * 1000
 
-BG      = "#0A0812"
-CARD    = "#130F1F"
-CARD2   = "#1A1430"
-GOLD    = "#C8A000"
-GOLD2   = "#E8C200"
-RED     = "#8B1A1A"
-RED2    = "#C0392B"
-GREEN   = "#00C48C"
-PURPLE  = "#6C63FF"
-TEXT    = "#F0EEF5"
-MUTED   = "#7B748F"
-BORDER  = "rgba(200,160,0,0.15)"
+st.set_page_config(page_title="Camponesa · Ads", page_icon="📊", layout="wide")
+st_autorefresh(interval=REFRESH_MS, key="ar")
 
-st.set_page_config(page_title="Camponesa Decor · Ads", page_icon="📊", layout="wide")
-st_autorefresh(interval=REFRESH_MS, key="auto_refresh")
-
-st.markdown(f"""
+st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-html, body, [class*="css"] {{
-    font-family: 'Inter', sans-serif !important;
-    background-color: {BG} !important;
-}}
-.stApp {{ background-color: {BG}; }}
-section[data-testid="stSidebar"] {{ background: {CARD}; }}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+html,body,[class*="css"]{font-family:'Inter',sans-serif!important;background:#08060F!important}
+.stApp{background:#08060F}
+div[data-testid="stVerticalBlock"]{gap:0}
+/* remove default streamlit padding */
+.block-container{padding-top:1rem!important}
+/* selectbox */
+div[data-baseweb="select"]>div{background:#130F1F!important;border-color:rgba(200,160,0,.2)!important;color:#F0EEF5!important}
 
-.header {{
-    background: linear-gradient(135deg, #150F25 0%, #1F1535 100%);
-    border: 1px solid {BORDER};
-    border-radius: 16px;
-    padding: 16px 24px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 20px;
-}}
-.header-title {{ color: {TEXT}; font-size: 22px; font-weight: 800; margin: 0; letter-spacing: -0.3px; }}
-.header-sub {{ color: {MUTED}; font-size: 12px; margin: 3px 0 0 0; }}
-.header-badge {{
-    margin-left: auto;
-    background: rgba(200,160,0,0.12);
-    border: 1px solid {GOLD};
-    color: {GOLD};
-    font-size: 11px;
-    font-weight: 600;
-    padding: 4px 12px;
-    border-radius: 20px;
-    letter-spacing: 0.5px;
-}}
+.hdr{background:linear-gradient(135deg,#120D22,#1C1535);border:1px solid rgba(200,160,0,.18);border-radius:14px;padding:14px 22px;display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.hdr-title{color:#F0EEF5;font-size:21px;font-weight:800;margin:0}
+.hdr-sub{color:#7B748F;font-size:11px;margin:2px 0 0}
+.live{margin-left:auto;background:rgba(0,196,140,.12);border:1px solid #00C48C;color:#00C48C;font-size:10px;font-weight:700;padding:4px 12px;border-radius:20px;letter-spacing:.8px}
 
-.kpi {{
-    background: {CARD};
-    border: 1px solid {BORDER};
-    border-radius: 12px;
-    padding: 16px 18px;
-    position: relative;
-    overflow: hidden;
-}}
-.kpi::before {{
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, {GOLD}, transparent);
-}}
-.kpi.green::before {{ background: linear-gradient(90deg, {GREEN}, transparent); }}
-.kpi.red::before   {{ background: linear-gradient(90deg, {RED2}, transparent); }}
-.kpi.purple::before{{ background: linear-gradient(90deg, {PURPLE}, transparent); }}
-.kpi-label {{ color: {MUTED}; font-size: 10px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 6px; }}
-.kpi-val   {{ color: {TEXT}; font-size: 26px; font-weight: 800; line-height: 1; }}
-.kpi-delta {{ font-size: 11px; font-weight: 600; margin-top: 4px; }}
-.kpi-delta.up   {{ color: {GREEN}; }}
-.kpi-delta.down {{ color: {RED2}; }}
-.kpi-delta.neu  {{ color: {MUTED}; }}
+.kcard{background:#130F1F;border:1px solid rgba(200,160,0,.15);border-radius:11px;padding:15px 17px;position:relative;overflow:hidden;margin-bottom:14px}
+.kcard::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kcard.g::after{background:linear-gradient(90deg,#00C48C,transparent)}
+.kcard.y::after{background:linear-gradient(90deg,#C8A000,transparent)}
+.kcard.r::after{background:linear-gradient(90deg,#C0392B,transparent)}
+.kcard.p::after{background:linear-gradient(90deg,#6C63FF,transparent)}
+.kcard.w::after{background:linear-gradient(90deg,#8B85A0,transparent)}
+.klbl{color:#7B748F;font-size:9px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;margin-bottom:5px}
+.kval{color:#F0EEF5;font-size:24px;font-weight:800;line-height:1.1}
+.ksub{color:#7B748F;font-size:10px;margin-top:3px}
 
-.panel {{
-    background: {CARD};
-    border: 1px solid {BORDER};
-    border-radius: 12px;
-    padding: 18px;
-}}
-.panel-title {{
-    color: {GOLD};
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    margin-bottom: 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}}
-.panel-title::after {{
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: {BORDER};
-}}
+.panel{background:#130F1F;border:1px solid rgba(200,160,0,.15);border-radius:12px;padding:16px;margin-bottom:14px}
+.ptitle{color:#C8A000;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(200,160,0,.12)}
 
-.camp-row {{
-    display: flex;
-    align-items: center;
-    padding: 8px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    gap: 10px;
-}}
-.camp-row:last-child {{ border-bottom: none; }}
-.camp-name {{ color: {TEXT}; font-size: 12px; font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-.camp-val  {{ color: {GOLD2}; font-size: 12px; font-weight: 700; min-width: 70px; text-align: right; }}
-.camp-badge-on  {{ background: rgba(0,196,140,0.15); color: {GREEN}; font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 600; }}
-.camp-badge-off {{ background: rgba(139,26,26,0.2); color: {RED2}; font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 600; }}
+.crow{display:flex;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:8px}
+.crow:last-child{border-bottom:none}
+.cname{color:#D0CCDF;font-size:11px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cval{color:#E8C200;font-size:11px;font-weight:700;min-width:65px;text-align:right}
+.bon{background:rgba(0,196,140,.12);color:#00C48C;font-size:9px;padding:2px 6px;border-radius:8px;font-weight:700}
+.boff{background:rgba(192,57,43,.15);color:#C0392B;font-size:9px;padding:2px 6px;border-radius:8px;font-weight:700}
 
-.ts {{ color: {MUTED}; font-size: 10px; text-align: right; margin-top: 16px; }}
+.funnel-wrap{padding:8px 0}
+.fstep{text-align:center;padding:18px 0;margin-bottom:3px;position:relative;transition:.2s}
+.fstep-inner{display:flex;justify-content:space-between;align-items:center;padding:0 12%}
+.fname{color:rgba(255,255,255,.85);font-size:11px;font-weight:600;text-align:left}
+.fval{color:#fff;font-size:15px;font-weight:800}
+.fpct{color:rgba(255,255,255,.6);font-size:10px;text-align:right}
+
+.rate-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.rate-row:last-child{border-bottom:none}
+.rlbl{color:#7B748F;font-size:11px}
+.rval{font-size:12px;font-weight:700}
+
+.ts{color:#3D3652;font-size:10px;text-align:right;margin-top:12px;padding-top:8px;border-top:1px solid rgba(255,255,255,.04)}
 </style>
 """, unsafe_allow_html=True)
 
-# ── Header ────────────────────────────────────────────────────────────────────
-logo_tag = ""
+# ── Logo ──────────────────────────────────────────────────────────────────────
+logo_tag = "🐓"
 if os.path.exists("logo.png"):
-    with open("logo.png", "rb") as f:
-        b64 = base64.b64encode(f.read()).decode()
-    logo_tag = f'<img src="data:image/png;base64,{b64}" style="height:48px;border-radius:8px;background:white;padding:3px">'
+    with open("logo.png","rb") as f:
+        b = base64.b64encode(f.read()).decode()
+    logo_tag = f'<img src="data:image/png;base64,{b}" style="height:46px;border-radius:7px;background:#fff;padding:3px">'
 
-h1, h2 = st.columns([5, 1])
-with h1:
-    st.markdown(f"""
-    <div class="header">
-      {logo_tag}
-      <div>
-        <p class="header-title">Dashboard de Campanhas</p>
-        <p class="header-sub">Camponesa Decor · Meta Ads</p>
-      </div>
-      <span class="header-badge">● LIVE</span>
-    </div>""", unsafe_allow_html=True)
-with h2:
-    st.write("")
-    st.write("")
-    st.write("")
-    if st.button("⟳ Atualizar", use_container_width=True):
-        st.rerun()
+hcol, bcol = st.columns([6,1])
+with hcol:
+    st.markdown(f'<div class="hdr">{logo_tag}<div><p class="hdr-title">Dashboard de Campanhas</p><p class="hdr-sub">Camponesa Decor · Meta Ads</p></div><span class="live">● LIVE</span></div>', unsafe_allow_html=True)
+with bcol:
+    st.write(""); st.write(""); st.write("")
+    if st.button("⟳ Atualizar", use_container_width=True): st.rerun()
 
 if not TOKEN:
-    st.error("TOKEN não configurado.")
-    st.stop()
+    st.error("TOKEN não configurado."); st.stop()
 
 # ── Filtros ───────────────────────────────────────────────────────────────────
 PRESETS = {"today":"Hoje","yesterday":"Ontem","this_week_mon_today":"Esta semana",
-           "this_month":"Este mês","last_7d":"Últ. 7 dias","last_30d":"Últ. 30 dias","last_month":"Mês passado"}
-
-f1, f2 = st.columns(2)
-with f1:
-    preset = st.selectbox("Período", list(PRESETS.keys()), index=3, format_func=lambda k: PRESETS[k],
-                          label_visibility="collapsed")
+           "this_month":"Este mês","last_7d":"Últ. 7 dias","last_30d":"Últ. 30 dias"}
+f1,f2 = st.columns(2)
+with f1: preset = st.selectbox("Período", list(PRESETS.keys()), index=3, format_func=lambda k:PRESETS[k])
 
 try:
-    with st.spinner(""):
-        campaigns = get_campaigns(ACCOUNT_ID, TOKEN)
+    campaigns = get_campaigns(ACCOUNT_ID, TOKEN)
+    opts = {"Todas as campanhas": None, **{c["name"]: c["id"] for c in campaigns}}
+    with f2: sel = st.selectbox("Campanha", list(opts.keys()))
+    raw = get_insights(ACCOUNT_ID, TOKEN, preset, campaign_id=opts[sel])
+    m   = parse_metrics(raw)
+    vd  = calc_budget(campaigns)
+    pct = (m["spend"]/vd*100) if vd>0 else 0
 
-    camp_opts = {"Todas as campanhas": None}
-    for c in campaigns:
-        camp_opts[c["name"]] = c["id"]
-
-    with f2:
-        sel_name = st.selectbox("Campanha", list(camp_opts.keys()), label_visibility="collapsed")
-    sel_id = camp_opts[sel_name]
-
-    with st.spinner("Carregando..."):
-        raw = get_insights(ACCOUNT_ID, TOKEN, preset, campaign_id=sel_id)
-
-    m  = parse_metrics(raw)
-    vd = calc_budget(campaigns)
-    pct = (m["spend"] / vd * 100) if vd > 0 else 0
-
-    # ── KPI row ───────────────────────────────────────────────────────────────
-    def kpi(col, label, val, delta="", dtype="neu", accent=""):
-        col.markdown(f"""
-        <div class="kpi {accent}">
-          <div class="kpi-label">{label}</div>
-          <div class="kpi-val">{val}</div>
-          {'<div class="kpi-delta ' + dtype + '">' + delta + '</div>' if delta else ''}
-        </div>""", unsafe_allow_html=True)
+    # ── KPIs ─────────────────────────────────────────────────────────────────
+    def kcard(col, lbl, val, sub="", acc="w"):
+        col.markdown(f'<div class="kcard {acc}"><div class="klbl">{lbl}</div><div class="kval">{val}</div>{"<div class=ksub>"+sub+"</div>" if sub else ""}</div>', unsafe_allow_html=True)
 
     k = st.columns(6)
-    kpi(k[0], "Orçamento Total",   f"R$ {vd:,.0f}")
-    kpi(k[1], "Valor Gasto",       f"R$ {m['spend']:,.0f}", f"{pct:.1f}% usado", "down" if pct>80 else "neu", "red")
-    kpi(k[2], "Impressões",        f"{m['impressions']:,}", "", "neu", "purple")
-    kpi(k[3], "CTR",               f"{m['ctr']:.2f}%", "taxa de cliques", "up" if m['ctr']>1 else "neu")
-    kpi(k[4], "Leads Totais",      f"{int(m['leads']):,}", "conversas fechadas", "up" if m['leads']>0 else "neu", "green")
-    kpi(k[5], "Custo por Lead",    f"R$ {m['cost_per_lead']:.2f}" if m['cost_per_lead']>0 else "—", "", "neu")
+    kcard(k[0],"Orçamento",    f"R$ {vd:,.0f}",           "",                           "y")
+    kcard(k[1],"Gasto",        f"R$ {m['spend']:,.0f}",   f"{pct:.1f}% consumido",       "r")
+    kcard(k[2],"Impressões",   f"{m['impressions']:,}",   "",                           "p")
+    kcard(k[3],"CTR",          f"{m['ctr']:.2f}%",        "taxa de cliques",             "w")
+    kcard(k[4],"Leads",        f"{int(m['leads']):,}",    "conversas fechadas",          "g")
+    kcard(k[5],"Custo/Lead",   f"R$ {m['cost_per_lead']:.2f}" if m["cost_per_lead"]>0 else "—","","y")
 
-    st.write("")
+    # ── 3 colunas ─────────────────────────────────────────────────────────────
+    cl, cm, cr = st.columns([1, 1.3, 0.9])
 
-    # ── Layout principal: campanhas | funil | métricas ────────────────────────
-    col_left, col_mid, col_right = st.columns([1.1, 1.4, 0.9])
-
-    # Campanhas
-    with col_left:
-        rows_html = ""
+    # ── Esquerda: campanhas + métricas ────────────────────────────────────────
+    with cl:
+        rows = ""
         for c in campaigns:
-            b = float(c.get("daily_budget") or c.get("lifetime_budget") or 0) / 100
-            badge = '<span class="camp-badge-on">ATIVA</span>' if c["status"]=="ACTIVE" else '<span class="camp-badge-off">PAUSADA</span>'
-            rows_html += f"""
-            <div class="camp-row">
-              {badge}
-              <span class="camp-name" title="{c['name']}">{c['name']}</span>
-              <span class="camp-val">R$ {b:,.0f}</span>
-            </div>"""
-        st.markdown(f"""
-        <div class="panel">
-          <div class="panel-title">📋 Campanhas</div>
-          {rows_html}
-        </div>""", unsafe_allow_html=True)
+            b2 = float(c.get("daily_budget") or c.get("lifetime_budget") or 0)/100
+            badge = '<span class="bon">ATIVA</span>' if c["status"]=="ACTIVE" else '<span class="boff">PAUSADA</span>'
+            name  = html.escape(c["name"])
+            rows += f'<div class="crow">{badge}<span class="cname" title="{name}">{name}</span><span class="cval">R$ {b2:,.0f}</span></div>'
+        st.markdown(f'<div class="panel"><div class="ptitle">📋 Campanhas</div>{rows}</div>', unsafe_allow_html=True)
 
-        st.write("")
-
-        # Mini métricas extras
         extras = [
-            ("CPM", f"R$ {m['cpm']:.2f}", "por mil impressões"),
-            ("Cliques no Link", f"{int(m['link_clicks']):,}", "acessos à página"),
-            ("Conversas", f"{int(m['lead_clicks']):,}", "iniciadas no WhatsApp"),
+            ("CPM",            f"R$ {m['cpm']:.2f}",         "por mil impressões", "y"),
+            ("Cliques no Link",f"{int(m['link_clicks']):,}", "acessos à página",   "w"),
+            ("Conversas",      f"{int(m['lead_clicks']):,}", "iniciadas",           "g"),
         ]
-        for label, val, sub in extras:
-            st.markdown(f"""
-            <div class="kpi" style="margin-bottom:8px">
-              <div class="kpi-label">{label}</div>
-              <div class="kpi-val" style="font-size:20px">{val}</div>
-              <div class="kpi-delta neu">{sub}</div>
-            </div>""", unsafe_allow_html=True)
+        for lbl,val,sub,acc in extras:
+            kcard(cl, lbl, val, sub, acc)
 
-    # Funil
-    with col_mid:
-        labels = ["Impressões", "Cliques no Link", "Conversas", "Leads"]
+    # ── Centro: funil CSS ─────────────────────────────────────────────────────
+    with cm:
+        labels = ["Impressões","Cliques no Link","Conversas","Leads"]
         values = [m["impressions"], int(m["link_clicks"]), int(m["lead_clicks"]), int(m["leads"])]
-        base   = values[0] if values[0] > 0 else 1
-
-        def vscale(v):
-            return max((v/base)**0.38, 0.15) * base
-
-        vtexts = [
-            f"<b>{labels[i]}</b><br>{values[i]:,}  ·  {values[i]/base*100:.1f}%"
-            for i in range(len(labels))
+        base   = values[0] if values[0]>0 else 1
+        colors = ["#8B1A1A","#B83232","#C8A000","#00C48C"]
+        clips  = [
+            "polygon(0% 0%,100% 0%,91% 100%,9% 100%)",
+            "polygon(9% 0%,91% 0%,82% 100%,18% 100%)",
+            "polygon(18% 0%,82% 0%,73% 100%,27% 100%)",
+            "polygon(27% 0%,73% 0%,68% 100%,32% 100%)",
         ]
+        steps = ""
+        for i,(lbl,val) in enumerate(zip(labels,values)):
+            p = val/base*100
+            steps += f"""
+            <div style="clip-path:{clips[i]};background:{colors[i]};padding:22px 0;margin-bottom:4px;border-radius:3px">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:0 18%">
+                <span style="color:rgba(255,255,255,.8);font-size:11px;font-weight:600">{lbl}</span>
+                <span style="color:#fff;font-size:15px;font-weight:800">{val:,}</span>
+                <span style="color:rgba(255,255,255,.55);font-size:10px">{p:.1f}%</span>
+              </div>
+            </div>"""
+        st.markdown(f'<div class="panel"><div class="ptitle">🎯 Funil de Leads</div><div style="padding:4px 0">{steps}</div></div>', unsafe_allow_html=True)
 
-        fig = go.Figure(go.Funnel(
-            y=labels,
-            x=[vscale(v) for v in values],
-            text=vtexts,
-            textposition="inside",
-            textinfo="text",
-            textfont=dict(size=14, color="#FFFFFF", family="Inter"),
-            marker=dict(
-                color=[RED, "#9B2D2D", GOLD, GREEN],
-                line=dict(width=2, color=BG),
-            ),
-            connector=dict(line=dict(color=BORDER, width=1), fillcolor=CARD2),
-            opacity=1,
-        ))
-        fig.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color=TEXT, size=13, family="Inter"),
-            margin=dict(l=0, r=0, t=4, b=4),
-            height=420,
-            xaxis=dict(visible=False),
-            yaxis=dict(tickfont=dict(size=12, color=MUTED)),
-        )
-        st.markdown('<div class="panel"><div class="panel-title">🎯 Funil de Leads</div>', unsafe_allow_html=True)
-        st.plotly_chart(fig, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # Métricas direita
-    with col_right:
-        # Gauge orçamento
-        fig_g = go.Figure(go.Indicator(
+    # ── Direita: gauge + taxas ────────────────────────────────────────────────
+    with cr:
+        fig = go.Figure(go.Indicator(
             mode="gauge+number",
-            value=min(pct, 100),
-            number={"suffix": "%", "font": {"color": TEXT, "size": 28, "family": "Inter"}},
-            title={"text": "Orçamento Usado", "font": {"color": MUTED, "size": 11, "family": "Inter"}},
+            value=min(pct,100),
+            number={"suffix":"%","font":{"color":"#F0EEF5","size":30,"family":"Inter"}},
+            title={"text":"Orçamento Usado","font":{"color":"#7B748F","size":10,"family":"Inter"}},
             gauge={
-                "axis": {"range": [0, 100], "tickcolor": MUTED, "tickfont": {"color": MUTED, "size": 9}},
-                "bar": {"color": GOLD},
-                "bgcolor": CARD2,
-                "bordercolor": BORDER,
-                "steps": [
-                    {"range": [0, 50],  "color": "rgba(200,160,0,0.08)"},
-                    {"range": [50, 80], "color": "rgba(200,160,0,0.15)"},
-                    {"range": [80, 100],"color": "rgba(192,57,43,0.2)"},
+                "axis":{"range":[0,100],"tickcolor":"#3D3652","tickfont":{"color":"#3D3652","size":8}},
+                "bar":{"color":"#C8A000"},
+                "bgcolor":"#1A1430",
+                "bordercolor":"rgba(200,160,0,.15)",
+                "steps":[
+                    {"range":[0,50],"color":"rgba(200,160,0,.06)"},
+                    {"range":[50,80],"color":"rgba(200,160,0,.12)"},
+                    {"range":[80,100],"color":"rgba(192,57,43,.18)"},
                 ],
-                "threshold": {"line": {"color": RED2, "width": 3}, "value": 80},
+                "threshold":{"line":{"color":"#C0392B","width":3},"value":80},
             }
         ))
-        fig_g.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=10, r=10, t=30, b=10),
-            height=220,
-            font=dict(family="Inter"),
-        )
-        st.markdown('<div class="panel"><div class="panel-title">💰 Orçamento</div>', unsafe_allow_html=True)
-        st.plotly_chart(fig_g, use_container_width=True)
+        fig.update_layout(paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",
+                          margin=dict(l=10,r=10,t=30,b=5),height=200,font=dict(family="Inter"))
+        st.markdown('<div class="panel"><div class="ptitle">💰 Orçamento</div>', unsafe_allow_html=True)
+        st.plotly_chart(fig, use_container_width=True)
+        st.markdown(f'<p style="color:#3D3652;font-size:10px;text-align:center;margin:-8px 0 8px">R$ {m["spend"]:,.2f} de R$ {vd:,.2f}</p></div>', unsafe_allow_html=True)
 
-        spend_disp = f"R$ {m['spend']:,.2f} / R$ {vd:,.2f}"
-        st.markdown(f'<p style="color:{MUTED};font-size:11px;text-align:center;margin-top:-10px">{spend_disp}</p>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        st.write("")
-
-        # Conversão funil
-        conv_pairs = [
-            ("Imp → Clique", m["impressions"], int(m["link_clicks"])),
-            ("Clique → Conv.", int(m["link_clicks"]), int(m["lead_clicks"])),
-            ("Conv. → Lead",  int(m["lead_clicks"]), int(m["leads"])),
+        pairs = [
+            ("Imp → Clique",  m["impressions"],        int(m["link_clicks"])),
+            ("Clique → Conv.",int(m["link_clicks"]),   int(m["lead_clicks"])),
+            ("Conv. → Lead",  int(m["lead_clicks"]),   int(m["leads"])),
         ]
-        rows2 = ""
-        for label, a, b2 in conv_pairs:
-            rate = (b2/a*100) if a > 0 else 0
-            color = GREEN if rate > 5 else GOLD if rate > 1 else RED2
-            rows2 += f"""
-            <div class="camp-row">
-              <span class="camp-name">{label}</span>
-              <span class="camp-val" style="color:{color}">{rate:.1f}%</span>
-            </div>"""
-        st.markdown(f"""
-        <div class="panel">
-          <div class="panel-title">📈 Taxas de Conversão</div>
-          {rows2}
-        </div>""", unsafe_allow_html=True)
+        rrows = ""
+        for lbl,a,b2 in pairs:
+            r = (b2/a*100) if a>0 else 0
+            col = "#00C48C" if r>5 else "#C8A000" if r>1 else "#C0392B"
+            rrows += f'<div class="rate-row"><span class="rlbl">{lbl}</span><span class="rval" style="color:{col}">{r:.1f}%</span></div>'
+        st.markdown(f'<div class="panel"><div class="ptitle">📈 Taxas de Conversão</div>{rrows}</div>', unsafe_allow_html=True)
 
-    st.markdown(f'<p class="ts">● LIVE · Atualiza a cada 15 min · {time.strftime("%d/%m/%Y %H:%M:%S")}</p>',
-                unsafe_allow_html=True)
+    st.markdown(f'<p class="ts">● LIVE · Auto-refresh 15min · {time.strftime("%d/%m/%Y %H:%M:%S")}</p>', unsafe_allow_html=True)
 
 except Exception as e:
     st.error(f"Erro: {e}")
